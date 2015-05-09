@@ -13,9 +13,12 @@
 
 #define TSMessageViewMinimumPadding 15.0
 
-#define TSDesignFileName @"TSMessagesDefaultDesign"
+#define TSDesignFileName @"TSMessagesDefaultDesign.json"
+#define TSMessageBundleName @"TSMessages"
+
 
 static NSMutableDictionary *_notificationDesign;
+static NSBundle *podBundle;
 
 @interface TSMessage (TSMessageView)
 - (void)fadeOutNotification:(TSMessageView *)currentView; // private method of TSMessage, but called by TSMessageView in -[fadeMeOut]
@@ -38,7 +41,6 @@ static NSMutableDictionary *_notificationDesign;
 
 /** Internal properties needed to resize the view on device rotation properly */
 @property (nonatomic, strong) UILabel *titleLabel;
-
 @property (nonatomic, strong) UILabel *contentLabel;
 @property (nonatomic, strong) UIImageView *iconImageView;
 @property (nonatomic, strong) UIButton *button;
@@ -58,98 +60,14 @@ static NSMutableDictionary *_notificationDesign;
 @end
 
 
-@implementation TSMessageView{
-    TSMessageNotificationType notificationType;
-}
--(void) setContentFont:(UIFont *)contentFont{
-    _contentFont = contentFont;
-    [self.contentLabel setFont:contentFont];
-}
-
--(void) setContentTextColor:(UIColor *)contentTextColor{
-    _contentTextColor = contentTextColor;
-    [self.contentLabel setTextColor:_contentTextColor];
-}
-
--(void) setTitleFont:(UIFont *)aTitleFont{
-    _titleFont = aTitleFont;
-    [self.titleLabel setFont:_titleFont];
-}
-
--(void)setTitleTextColor:(UIColor *)aTextColor{
-    _titleTextColor = aTextColor;
-    [self.titleLabel setTextColor:_titleTextColor];
-}
-
--(void) setMessageIcon:(UIImage *)messageIcon{
-    _messageIcon = messageIcon;
-    [self updateCurrentIcon];
-}
-
--(void) setErrorIcon:(UIImage *)errorIcon{
-    _errorIcon = errorIcon;
-    [self updateCurrentIcon];
-}
-
--(void) setSuccessIcon:(UIImage *)successIcon{
-    _successIcon = successIcon;
-    [self updateCurrentIcon];
-}
-
--(void) setWarningIcon:(UIImage *)warningIcon{
-    _warningIcon = warningIcon;
-    [self updateCurrentIcon];
-}
-
--(void) updateCurrentIcon{
-    UIImage *image = nil;
-    switch (notificationType)
-    {
-        case TSMessageNotificationTypeMessage:
-        {
-            image = _messageIcon;
-            self.iconImageView.image = _messageIcon;
-            break;
-        }
-        case TSMessageNotificationTypeError:
-        {
-            image = _errorIcon;
-            self.iconImageView.image = _errorIcon;
-            break;
-        }
-        case TSMessageNotificationTypeSuccess:
-        {
-            image = _successIcon;
-            self.iconImageView.image = _successIcon;
-            break;
-        }
-        case TSMessageNotificationTypeWarning:
-        {
-            image = _warningIcon;
-            self.iconImageView.image = _warningIcon;
-            break;
-        }
-        default:
-            break;
-    }
-    self.iconImageView.frame = CGRectMake(self.padding * 2,
-                                          self.padding,
-                                          image.size.width,
-                                          image.size.height);
-}
-
-
-
+@implementation TSMessageView
 
 + (NSMutableDictionary *)notificationDesign
 {
     if (!_notificationDesign)
     {
-        NSString *path = [[NSBundle bundleForClass:self.class] pathForResource:TSDesignFileName ofType:@"json"];
-        NSData *data = [NSData dataWithContentsOfFile:path];
-        NSAssert(data != nil, @"Could not read TSMessages config file from main bundle with name %@.json", TSDesignFileName);
-        
-        _notificationDesign = [NSMutableDictionary dictionaryWithDictionary:[NSJSONSerialization JSONObjectWithData:data
+        NSString *path = [[[NSBundle mainBundle] resourcePath] stringByAppendingPathComponent:TSDesignFileName];
+        _notificationDesign = [NSMutableDictionary dictionaryWithDictionary:[NSJSONSerialization JSONObjectWithData:[NSData dataWithContentsOfFile:path]
                                                                                                             options:kNilOptions
                                                                                                               error:nil]];
     }
@@ -184,7 +102,7 @@ static NSMutableDictionary *_notificationDesign;
 - (id)initWithTitle:(NSString *)title
            subtitle:(NSString *)subtitle
               image:(UIImage *)image
-               type:(TSMessageNotificationType)aNotificationType
+               type:(TSMessageNotificationType)notificationType
            duration:(CGFloat)duration
    inViewController:(UIViewController *)viewController
            callback:(void (^)())callback
@@ -211,7 +129,6 @@ canBeDismissedByUser:(BOOL)dismissingEnabled
         
         NSDictionary *current;
         NSString *currentString;
-        notificationType = aNotificationType;
         switch (notificationType)
         {
             case TSMessageNotificationTypeMessage:
@@ -244,7 +161,7 @@ canBeDismissedByUser:(BOOL)dismissingEnabled
         
         if (!image && [[current valueForKey:@"imageName"] length])
         {
-            image = [self bundledImageNamed:[current valueForKey:@"imageName"]];
+            image = [UIImage imageNamed:[NSString stringWithFormat:@"%@.bundle/%@", TSMessageBundleName, [current valueForKey:@"imageName"]]];
         }
         
         if (![TSMessage iOS7StyleEnabled])
@@ -252,7 +169,7 @@ canBeDismissedByUser:(BOOL)dismissingEnabled
             self.alpha = 0.0;
             
             // add background image here
-            UIImage *backgroundImage = [self bundledImageNamed:[current valueForKey:@"backgroundImageName"]];
+            UIImage *backgroundImage = [UIImage imageNamed:[NSString stringWithFormat:@"%@.bundle/%@", TSMessageBundleName, [current valueForKey:@"backgroundImageName"]]];
             backgroundImage = [backgroundImage stretchableImageWithLeftCapWidth:0.0 topCapHeight:0.0];
             
             _backgroundImageView = [[UIImageView alloc] initWithImage:backgroundImage];
@@ -281,16 +198,8 @@ canBeDismissedByUser:(BOOL)dismissingEnabled
         [self.titleLabel setTextColor:fontColor];
         [self.titleLabel setBackgroundColor:[UIColor clearColor]];
         CGFloat fontSize = [[current valueForKey:@"titleFontSize"] floatValue];
-        NSString *fontName = [current valueForKey:@"titleFontName"];
-        if (fontName != nil) {
-            [self.titleLabel setFont:[UIFont fontWithName:fontName size:fontSize]];
-        } else {
-            [self.titleLabel setFont:[UIFont boldSystemFontOfSize:fontSize]];
-        }
-        [self.titleLabel setShadowColor:[UIColor colorWithHexString:[current valueForKey:@"shadowColor"] alpha:1.0]];
-        [self.titleLabel setShadowOffset:CGSizeMake([[current valueForKey:@"shadowOffsetX"] floatValue],
-                                                    [[current valueForKey:@"shadowOffsetY"] floatValue])];
-        
+//        NSString *fontName = [current valueForKey:@"titleFontName"];
+        [self.titleLabel setFont:[UIFont fontWithName:@"Avenir-Heavy" size:fontSize]];
         self.titleLabel.numberOfLines = 0;
         self.titleLabel.lineBreakMode = NSLineBreakByWordWrapping;
         [self addSubview:self.titleLabel];
@@ -309,14 +218,8 @@ canBeDismissedByUser:(BOOL)dismissingEnabled
             [self.contentLabel setTextColor:contentTextColor];
             [self.contentLabel setBackgroundColor:[UIColor clearColor]];
             CGFloat fontSize = [[current valueForKey:@"contentFontSize"] floatValue];
-            NSString *fontName = [current valueForKey:@"contentFontName"];
-            if (fontName != nil) {
-                [self.contentLabel setFont:[UIFont fontWithName:fontName size:fontSize]];
-            } else {
-                [self.contentLabel setFont:[UIFont systemFontOfSize:fontSize]];
-            }
-            [self.contentLabel setShadowColor:self.titleLabel.shadowColor];
-            [self.contentLabel setShadowOffset:self.titleLabel.shadowOffset];
+//            NSString *fontName = [current valueForKey:@"contentFontName"];
+            [self.contentLabel setFont:[UIFont fontWithName:@"Avenir-Medium" size:fontSize]];
             self.contentLabel.lineBreakMode = self.titleLabel.lineBreakMode;
             self.contentLabel.numberOfLines = 0;
             
@@ -339,26 +242,19 @@ canBeDismissedByUser:(BOOL)dismissingEnabled
             _button = [UIButton buttonWithType:UIButtonTypeCustom];
             
             
-            UIImage *buttonBackgroundImage = [self bundledImageNamed:[current valueForKey:@"buttonBackgroundImageName"]];
+            UIImage *buttonBackgroundImage = [UIImage imageNamed:[NSString stringWithFormat:@"%@.bundle/%@", TSMessageBundleName, [current valueForKey:@"buttonBackgroundImageName"]]];
             
             buttonBackgroundImage = [buttonBackgroundImage resizableImageWithCapInsets:UIEdgeInsetsMake(15.0, 12.0, 15.0, 11.0)];
             
             if (!buttonBackgroundImage)
             {
-                buttonBackgroundImage = [self bundledImageNamed:[current valueForKey:@"NotificationButtonBackground"]];
+                buttonBackgroundImage = [UIImage imageNamed:[NSString stringWithFormat:@"%@.bundle/%@", TSMessageBundleName, [current valueForKey:@"NotificationButtonBackground"]]];
                 buttonBackgroundImage = [buttonBackgroundImage resizableImageWithCapInsets:UIEdgeInsetsMake(15.0, 12.0, 15.0, 11.0)];
             }
             
             [self.button setBackgroundImage:buttonBackgroundImage forState:UIControlStateNormal];
             [self.button setTitle:self.buttonTitle forState:UIControlStateNormal];
             
-            UIColor *buttonTitleShadowColor = [UIColor colorWithHexString:[current valueForKey:@"buttonTitleShadowColor"] alpha:1.0];
-            if (!buttonTitleShadowColor)
-            {
-                buttonTitleShadowColor = self.titleLabel.shadowColor;
-            }
-            
-            [self.button setTitleShadowColor:buttonTitleShadowColor forState:UIControlStateNormal];
             
             UIColor *buttonTitleTextColor = [UIColor colorWithHexString:[current valueForKey:@"buttonTitleTextColor"] alpha:1.0];
             if (!buttonTitleTextColor)
@@ -368,8 +264,6 @@ canBeDismissedByUser:(BOOL)dismissingEnabled
             
             [self.button setTitleColor:buttonTitleTextColor forState:UIControlStateNormal];
             self.button.titleLabel.font = [UIFont boldSystemFontOfSize:14.0];
-            self.button.titleLabel.shadowOffset = CGSizeMake([[current valueForKey:@"buttonTitleShadowOffsetX"] floatValue],
-                                                             [[current valueForKey:@"buttonTitleShadowOffsetY"] floatValue]);
             [self.button addTarget:self
                             action:@selector(buttonTapped:)
                   forControlEvents:UIControlEventTouchUpInside];
@@ -450,7 +344,7 @@ canBeDismissedByUser:(BOOL)dismissingEnabled
     CGFloat padding = [self padding];
     
     self.titleLabel.frame = CGRectMake(self.textSpaceLeft,
-                                       padding,
+                                       padding + 10.0f,
                                        screenWidth - padding - self.textSpaceLeft - self.textSpaceRight,
                                        0.0);
     [self.titleLabel sizeToFit];
@@ -561,11 +455,9 @@ canBeDismissedByUser:(BOOL)dismissingEnabled
     [[TSMessage sharedMessage] performSelectorOnMainThread:@selector(fadeOutNotification:) withObject:self waitUntilDone:NO];
 }
 
-- (void)didMoveToWindow
-{
+- (void)didMoveToWindow {
     [super didMoveToWindow];
-    if (self.duration == TSMessageNotificationDurationEndless && self.superview && !self.window )
-    {
+    if (self.duration == TSMessageNotificationDurationEndless && self.superview && !self.window ) {
         // view controller was dismissed, let's fade out
         [self fadeMeOut];
     }
@@ -598,13 +490,6 @@ canBeDismissedByUser:(BOOL)dismissingEnabled
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldReceiveTouch:(UITouch *)touch
 {
     return ! ([touch.view isKindOfClass:[UIControl class]]);
-}
-
-#pragma mark - Grab Image From Pod Bundle
-- (UIImage *)bundledImageNamed:(NSString*)name{
-    NSBundle *bundle = [NSBundle bundleForClass:[self class]];
-    NSString *imagePath = [bundle pathForResource:name ofType:nil];
-    return [[UIImage alloc] initWithContentsOfFile:imagePath];
 }
 
 @end

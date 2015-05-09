@@ -7,6 +7,7 @@
 //
 
 #import <UIKit/UIKit.h>
+
 // NS_ENUM is now the preferred way to do typedefs. It gives the compiler and debugger more information, which helps everyone.
 // When using SDK 6 or later, NS_ENUM is defined by Apple, so this block does nothing.
 // For SDK 5 or earlier, this is the same definition block Apple uses.
@@ -27,22 +28,8 @@
 
 #define TS_SYSTEM_VERSION_LESS_THAN(v)            ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] == NSOrderedAscending)
 
+
 @class TSMessageView;
-
-
-/** Define on which position a specific TSMessage should be displayed */
-@protocol TSMessageViewProtocol<NSObject>
-
-@optional
-/** Implement this method to pass a custom position for a specific message */
-- (CGFloat)messageLocationOfMessageView:(TSMessageView *)messageView;
-
-/** You can custimze the given TSMessageView, like setting its alpha or adding a subview */
-- (void)customizeMessageView:(TSMessageView *)messageView;
-
-@end
-
-
 
 typedef NS_ENUM(NSInteger, TSMessageNotificationType) {
     TSMessageNotificationTypeMessage = 0,
@@ -64,9 +51,6 @@ typedef NS_ENUM(NSInteger,TSMessageNotificationDuration) {
 
 
 @interface TSMessage : NSObject
-
-/** By setting this delegate it's possible to set a custom offset for the notification view */
-@property (nonatomic, assign) id <TSMessageViewProtocol>delegate;
 
 + (instancetype)sharedMessage;
 
@@ -128,7 +112,7 @@ typedef NS_ENUM(NSInteger,TSMessageNotificationDuration) {
                                 subtitle:(NSString *)subtitle
                                     type:(TSMessageNotificationType)type
                                 duration:(NSTimeInterval)duration
-                     canBeDismissedByUser:(BOOL)dismissingEnabled;
+                    canBeDismissedByUser:(BOOL)dismissingEnabled;
 
 
 
@@ -174,9 +158,6 @@ typedef NS_ENUM(NSInteger,TSMessageNotificationDuration) {
 /** Use this method to set a default view controller to display the messages in */
 + (void)setDefaultViewController:(UIViewController *)defaultViewController;
 
-/** Set a delegate to have full control over the position of the message view */
-+ (void)setDelegate:(id<TSMessageViewProtocol>)delegate;
-
 /** Use this method to use custom designs in your messages. */
 + (void)addCustomDesignFromFileWithName:(NSString *)fileName;
 
@@ -195,8 +176,8 @@ typedef NS_ENUM(NSInteger,TSMessageNotificationDuration) {
  This depends on the Base SDK and the currently used device */
 + (BOOL)iOS7StyleEnabled;
 
-/** Indicates whether the current navigationBar is hidden by isNavigationBarHidden 
- on the UINavigationController or isHidden on the navigationBar of the current 
+/** Indicates whether the current navigationBar is hidden by isNavigationBarHidden
+ on the UINavigationController or isHidden on the navigationBar of the current
  UINavigationController */
 + (BOOL)isNavigationBarInNavigationControllerHidden:(UINavigationController *)navController;
 
